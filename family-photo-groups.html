@@ -120,11 +120,8 @@ function isMatch(name, query) {
   var nq = normalize(query);
   if (!nq) return false;
   if (nm === nq) return true;
-  var nameWords = nm.split(' ');
-  for (var i = 0; i < nameWords.length; i++) {
-    if (nameWords[i].indexOf(nq) === 0) return true; // word starts with the query (handles "Kapil's" matching "kapil")
-  }
-  return false;
+  var nameWords = nm.split(' ').map(function (w) { return w.replace(/['’]s$/, ''); }); // strip trailing possessive, e.g. "kapil's" -> "kapil"
+  return nameWords.indexOf(nq) !== -1;
 }
 function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
