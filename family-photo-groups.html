@@ -89,7 +89,7 @@
 
     <span class="field-label">Your name</span>
     <div class="name-row">
-      <input type="text" id="nameInput" placeholder="e.g. Sam Smith" autocomplete="off" disabled>
+      <input type="text" id="nameInput" placeholder="e.g. Kirti" autocomplete="off" disabled>
       <button class="btn-primary" id="searchBtn" disabled>Find</button>
     </div>
 
@@ -118,11 +118,12 @@ function normalize(s) { return String(s).trim().toLowerCase().replace(/\s+/g, ' 
 function isMatch(name, query) {
   var nm = normalize(name);
   var nq = normalize(query);
+  if (!nq) return false;
   if (nm === nq) return true;
   var nameWords = nm.split(' ');
-  if (nameWords.indexOf(nq) !== -1) return true;
-  var queryWords = nq.split(' ');
-  if (queryWords.indexOf(nm) !== -1) return true;
+  for (var i = 0; i < nameWords.length; i++) {
+    if (nameWords[i].indexOf(nq) === 0) return true; // word starts with the query (handles "Kapil's" matching "kapil")
+  }
   return false;
 }
 function escapeHtml(s) {
@@ -140,14 +141,28 @@ function findColIndex(headerRow, keywords, exact) {
   return -1;
 }
 
+function fetchWithRetry(url, attemptsLeft) {
+  return fetch(url, { cache: 'no-store' }).then(function (res) {
+    if (!res.ok) throw new Error('bad status');
+    return res;
+  }).catch(function (err) {
+    if (attemptsLeft > 1) {
+      return new Promise(function (resolve) { setTimeout(resolve, 700); })
+        .then(function () { return fetchWithRetry(url, attemptsLeft - 1); });
+    }
+    throw err;
+  });
+}
+
 function loadGuests() {
   if (!SHEET_CSV_URL || SHEET_CSV_URL.indexOf('PASTE_YOUR') === 0) {
     subText.textContent = "This page isn't connected to a guest list yet — the organizer needs to add the sheet link.";
     return;
   }
-  fetch(SHEET_CSV_URL)
+  subText.textContent = "Loading the guest list…";
+  var cacheBustedUrl = SHEET_CSV_URL + (SHEET_CSV_URL.indexOf('?') === -1 ? '?' : '&') + '_=' + Date.now();
+  fetchWithRetry(cacheBustedUrl, 3)
     .then(function (res) {
-      if (!res.ok) throw new Error('fetch failed');
       return res.text();
     })
     .then(function (csvText) {
@@ -184,9 +199,17 @@ function loadGuests() {
       nameInput.focus();
     })
     .catch(function () {
-      subText.textContent = "Couldn't load the guest list right now. Check with the organizer, or try refreshing in a minute.";
+      subText.innerHTML = "Couldn't load the guest list right now. <a href=\"#\" id=\"retryLink\" style=\"color: var(--red); text-decoration: underline;\">Try again</a>.";
+      var retryLink = document.getElementById('retryLink');
+      if (retryLink) {
+        retryLink.addEventListener('click', function (e) {
+          e.preventDefault();
+          loadGuests();
+        });
+      }
     });
 }
+
 
 function renderResults(matches, query) {
   if (!matches.length) {
