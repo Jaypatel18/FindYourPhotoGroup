@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Find Your Photo Groups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root {
+    --charcoal: #1b1b1e;
+    --paper: #efe3c0;
+    --ink: #2b2620;
+    --ink-soft: #5a5346;
+    --red: #b23b28;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    background: var(--charcoal);
+    background-image:
+      radial-gradient(circle at 20% 15%, rgba(255,255,255,0.035), transparent 40%),
+      radial-gradient(circle at 85% 80%, rgba(255,255,255,0.03), transparent 45%);
+    font-family: 'Space Grotesk', sans-serif;
+    color: var(--paper);
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px 16px;
+  }
+  .stage { width: 100%; max-width: 460px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+  .kicker { font-size: 13px; color: rgba(239,227,192,0.55); text-align: center; }
+  .kicker strong { color: var(--paper); font-weight: 600; }
+
+  .ticket {
+    position: relative; width: 100%; background: var(--paper); color: var(--ink);
+    transform: rotate(-0.6deg); box-shadow: 10px 14px 0 rgba(0,0,0,0.35);
+    padding: 34px 30px 28px;
+  }
+  .ticket::before, .ticket::after {
+    content: ""; position: absolute; width: 26px; height: 26px; background: var(--charcoal);
+    border-radius: 50%; top: 50%; transform: translateY(-50%); box-shadow: 0 0 0 4px rgba(0,0,0,0.15) inset;
+  }
+  .ticket::before { left: -13px; } .ticket::after { right: -13px; }
+  .ticket-title { font-family: 'Fraunces', serif; font-weight: 700; font-size: 28px; line-height: 1.1; margin: 0 0 6px; }
+  .ticket-sub { font-size: 14px; color: var(--ink-soft); margin: 0 0 24px; }
+  .field-label { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); display: block; margin-bottom: 8px; }
+  .name-row { display: flex; gap: 10px; }
+  input[type="text"] {
+    flex: 1; font-family: 'Space Grotesk', sans-serif; font-size: 17px; padding: 12px 14px;
+    border: 2px solid var(--ink); background: #fbf6e9; color: var(--ink); outline: none;
+  }
+  input[type="text"]:focus { border-color: var(--red); }
+  input[type="text"]:disabled { opacity: 0.6; }
+  button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; cursor: pointer; border: none; }
+  .btn-primary { background: var(--red); color: var(--paper); font-size: 15px; padding: 0 20px; border: 2px solid var(--ink); }
+  .btn-primary:hover { background: #9c331f; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .result { margin-top: 24px; display: none; }
+  .result.show { display: block; }
+  .result-divider { border-top: 2px dashed rgba(43,38,32,0.3); margin-bottom: 16px; }
+  .result-count { font-size: 13px; letter-spacing: 0.04em; color: var(--ink-soft); margin: 0 0 14px; }
+  .result-empty p { font-size: 15px; line-height: 1.5; margin: 0; }
+
+  .group-block { display: flex; align-items: flex-start; gap: 16px; padding: 12px 0; border-bottom: 1px dashed rgba(43,38,32,0.2); }
+  .group-block:last-child { border-bottom: none; }
+  .group-number-badge {
+    font-family: 'Fraunces', serif; font-weight: 900; font-size: 34px; color: var(--red);
+    min-width: 46px; line-height: 1; text-align: center;
+  }
+  .group-info { flex: 1; padding-top: 2px; }
+  .group-side { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 4px; }
+  .group-members { font-size: 14.5px; line-height: 1.5; color: var(--ink); margin: 0; }
+  .group-members strong { color: var(--red); }
+
+  @media (max-width: 380px) {
+    .ticket { padding: 28px 20px 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="kicker"><strong>Family Photo</strong> · find your groups before we line up</div>
+
+  <div class="ticket">
+    <h1 class="ticket-title">Find Your Photo Groups</h1>
+    <p class="ticket-sub" id="subText">Type your name — we'll show every group you're in.</p>
+
+    <span class="field-label">Your name</span>
+    <div class="name-row">
+      <input type="text" id="nameInput" placeholder="e.g. Kirti" autocomplete="off" disabled>
+      <button class="btn-primary" id="searchBtn" disabled>Find</button>
+    </div>
+
+    <div class="result" id="result"></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   EDIT THIS ONE LINE, then upload the file — that's the only setup step.
+
+   1. In Google Sheets: File -> Share -> Publish to web
+   2. Choose the sheet, set format to "Comma-separated values (.csv)", click Publish
+   3. Copy the link and paste it below, between the quotes
+   ========================================================================= */
+var SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSts9ykc8KUu0nG4mlm4x3lAsOkxZKZSoi2yx7syOlOU_qKfRFvDV0sMYqfMcIlokTWBpIRSpcNUQu/pub?output=csv";
+/* ========================================================================= */
+
+var nameInput = document.getElementById('nameInput');
+var searchBtn = document.getElementById('searchBtn');
+var resultEl = document.getElementById('result');
+var subText = document.getElementById('subText');
+var photoGroups = []; // [{ number, side, members: [] }]
+
+function normalize(s) { return String(s).trim().toLowerCase().replace(/\s+/g, ' '); }
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function findColIndex(headerRow, keywords, exact) {
+  for (var i = 0; i < headerRow.length; i++) {
+    var h = normalize(headerRow[i] || '');
+    if (!h) continue;
+    for (var j = 0; j < keywords.length; j++) {
+      if (exact ? h === keywords[j] : h.indexOf(keywords[j]) !== -1) return i;
+    }
+  }
+  return -1;
+}
+
+function loadGuests() {
+  if (!SHEET_CSV_URL || SHEET_CSV_URL.indexOf('PASTE_YOUR') === 0) {
+    subText.textContent = "This page isn't connected to a guest list yet — the organizer needs to add the sheet link.";
+    return;
+  }
+  fetch(SHEET_CSV_URL)
+    .then(function (res) {
+      if (!res.ok) throw new Error('fetch failed');
+      return res.text();
+    })
+    .then(function (csvText) {
+      var parsed = Papa.parse(csvText, { header: false, skipEmptyLines: true });
+      var rows = parsed.data;
+      if (!rows.length) throw new Error('empty sheet');
+
+      var headerRow = rows[0];
+      var dataRows = rows.slice(1);
+
+      var groupColIdx = findColIndex(headerRow, ['group #'], false);
+      var sideColIdx = findColIndex(headerRow, ['side'], false);
+      if (groupColIdx === -1) throw new Error('no group column');
+
+      var memberColIndices = [];
+      for (var i = 0; i < headerRow.length; i++) {
+        if (normalize(headerRow[i] || '').indexOf('family member') !== -1) memberColIndices.push(i);
+      }
+
+      photoGroups = dataRows.map(function (row) {
+        var number = String(row[groupColIdx] || '').trim();
+        var side = sideColIdx !== -1 ? String(row[sideColIdx] || '').trim() : '';
+        var members = memberColIndices
+          .map(function (idx) { return String(row[idx] || '').trim(); })
+          .filter(function (v) { return v !== ''; });
+        return { number: number, side: side, members: members };
+      }).filter(function (g) { return g.number && g.members.length > 0; });
+
+      if (!photoGroups.length) throw new Error('no groups parsed');
+
+      subText.textContent = "Type your name — we'll show every group you're in.";
+      nameInput.disabled = false;
+      searchBtn.disabled = false;
+      nameInput.focus();
+    })
+    .catch(function () {
+      subText.textContent = "Couldn't load the guest list right now. Check with the organizer, or try refreshing in a minute.";
+    });
+}
+
+function renderResults(matches, query) {
+  var nq = normalize(query);
+  if (!matches.length) {
+    resultEl.innerHTML =
+      '<div class="result-divider"></div>' +
+      '<div class="result-empty"><p>We couldn\'t find "' + escapeHtml(query) + '" in any group. Try just your first name, or check with the organizer.</p></div>';
+    resultEl.classList.add('show');
+    return;
+  }
+
+  var blocks = matches.map(function (g) {
+    var membersHtml = g.members.map(function (m) {
+      var isYou = normalize(m).indexOf(nq) !== -1 || nq.indexOf(normalize(m)) !== -1;
+      return isYou ? '<strong>' + escapeHtml(m) + '</strong>' : escapeHtml(m);
+    }).join(', ');
+    var sideHtml = g.side ? '<p class="group-side">' + escapeHtml(g.side) + '</p>' : '';
+    return '<div class="group-block">' +
+      '<div class="group-number-badge">' + escapeHtml(g.number) + '</div>' +
+      '<div class="group-info">' + sideHtml + '<p class="group-members">' + membersHtml + '</p></div>' +
+      '</div>';
+  }).join('');
+
+  resultEl.innerHTML =
+    '<div class="result-divider"></div>' +
+    '<p class="result-count">You\'re in ' + matches.length + ' group' + (matches.length === 1 ? '' : 's') + ':</p>' +
+    blocks;
+  resultEl.classList.add('show');
+}
+
+function search() {
+  var query = nameInput.value.trim();
+  if (!query) return;
+  var nq = normalize(query);
+  var matches = photoGroups.filter(function (g) {
+    return g.members.some(function (m) {
+      return normalize(m).indexOf(nq) !== -1 || nq.indexOf(normalize(m)) !== -1;
+    });
+  });
+  renderResults(matches, query);
+}
+searchBtn.addEventListener('click', search);
+nameInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') search(); });
+
+loadGuests();
+</script>
+
+</body>
+</html>
