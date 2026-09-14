@@ -89,7 +89,7 @@
 
     <span class="field-label">Your name</span>
     <div class="name-row">
-      <input type="text" id="nameInput" placeholder="e.g. Kirti" autocomplete="off" disabled>
+      <input type="text" id="nameInput" placeholder="e.g. Sam Smith" autocomplete="off" disabled>
       <button class="btn-primary" id="searchBtn" disabled>Find</button>
     </div>
 
@@ -105,7 +105,7 @@
    2. Choose the sheet, set format to "Comma-separated values (.csv)", click Publish
    3. Copy the link and paste it below, between the quotes
    ========================================================================= */
-var SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSts9ykc8KUu0nG4mlm4x3lAsOkxZKZSoi2yx7syOlOU_qKfRFvDV0sMYqfMcIlokTWBpIRSpcNUQu/pub?output=csv";
+var SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSts9ykc8KUu0nG4mlm4x3lAsOkxZKZSoi2yx7syOlOU_qKfRFvDV0sMYqfMcIlokTWBpIRSpcNUQu/pub?gid=0&single=true&output=csv";
 /* ========================================================================= */
 
 var nameInput = document.getElementById('nameInput');
@@ -115,6 +115,16 @@ var subText = document.getElementById('subText');
 var photoGroups = []; // [{ number, side, members: [] }]
 
 function normalize(s) { return String(s).trim().toLowerCase().replace(/\s+/g, ' '); }
+function isMatch(name, query) {
+  var nm = normalize(name);
+  var nq = normalize(query);
+  if (nm === nq) return true;
+  var nameWords = nm.split(' ');
+  if (nameWords.indexOf(nq) !== -1) return true;
+  var queryWords = nq.split(' ');
+  if (queryWords.indexOf(nm) !== -1) return true;
+  return false;
+}
 function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -179,7 +189,6 @@ function loadGuests() {
 }
 
 function renderResults(matches, query) {
-  var nq = normalize(query);
   if (!matches.length) {
     resultEl.innerHTML =
       '<div class="result-divider"></div>' +
@@ -190,7 +199,7 @@ function renderResults(matches, query) {
 
   var blocks = matches.map(function (g) {
     var membersHtml = g.members.map(function (m) {
-      var isYou = normalize(m).indexOf(nq) !== -1 || nq.indexOf(normalize(m)) !== -1;
+      var isYou = isMatch(m, query);
       return isYou ? '<strong>' + escapeHtml(m) + '</strong>' : escapeHtml(m);
     }).join(', ');
     var sideHtml = g.side ? '<p class="group-side">' + escapeHtml(g.side) + '</p>' : '';
@@ -210,11 +219,8 @@ function renderResults(matches, query) {
 function search() {
   var query = nameInput.value.trim();
   if (!query) return;
-  var nq = normalize(query);
   var matches = photoGroups.filter(function (g) {
-    return g.members.some(function (m) {
-      return normalize(m).indexOf(nq) !== -1 || nq.indexOf(normalize(m)) !== -1;
-    });
+    return g.members.some(function (m) { return isMatch(m, query); });
   });
   renderResults(matches, query);
 }
