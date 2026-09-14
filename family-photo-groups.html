@@ -3,19 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Find Your Photo Group — Builder</title>
+<title>Find Your Photo Groups</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
   :root {
     --charcoal: #1b1b1e;
-    --charcoal-2: #26262a;
     --paper: #efe3c0;
     --ink: #2b2620;
     --ink-soft: #5a5346;
     --red: #b23b28;
-    --green: #5c6b4c;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -29,7 +27,7 @@
     display: flex; align-items: center; justify-content: center;
     padding: 40px 16px;
   }
-  .stage { width: 100%; max-width: 480px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+  .stage { width: 100%; max-width: 460px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
   .kicker { font-size: 13px; color: rgba(239,227,192,0.55); text-align: center; }
   .kicker strong { color: var(--paper); font-weight: 600; }
 
@@ -52,428 +50,178 @@
     border: 2px solid var(--ink); background: #fbf6e9; color: var(--ink); outline: none;
   }
   input[type="text"]:focus { border-color: var(--red); }
+  input[type="text"]:disabled { opacity: 0.6; }
   button { font-family: 'Space Grotesk', sans-serif; font-weight: 600; cursor: pointer; border: none; }
   .btn-primary { background: var(--red); color: var(--paper); font-size: 15px; padding: 0 20px; border: 2px solid var(--ink); }
   .btn-primary:hover { background: #9c331f; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
   .result { margin-top: 24px; display: none; }
   .result.show { display: block; }
-  .result-divider { border-top: 2px dashed rgba(43,38,32,0.3); margin-bottom: 22px; }
-  .result-found { display: flex; align-items: center; gap: 20px; }
-  .group-number {
-    font-family: 'Fraunces', serif; font-weight: 900; font-size: 76px; line-height: 0.9; color: var(--red);
-    transform: scale(0.7); opacity: 0; transition: transform 0.35s cubic-bezier(.2,1.4,.4,1), opacity 0.25s ease;
+  .result-divider { border-top: 2px dashed rgba(43,38,32,0.3); margin-bottom: 16px; }
+  .result-count { font-size: 13px; letter-spacing: 0.04em; color: var(--ink-soft); margin: 0 0 14px; }
+  .result-empty p { font-size: 15px; line-height: 1.5; margin: 0; }
+
+  .group-block { display: flex; align-items: flex-start; gap: 16px; padding: 12px 0; border-bottom: 1px dashed rgba(43,38,32,0.2); }
+  .group-block:last-child { border-bottom: none; }
+  .group-number-badge {
+    font-family: 'Fraunces', serif; font-weight: 900; font-size: 34px; color: var(--red);
+    min-width: 46px; line-height: 1; text-align: center;
   }
-  .group-number.pop { transform: scale(1); opacity: 1; }
-  .result-text p { margin: 0 0 4px; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
-  .result-text h3 { margin: 0; font-family: 'Fraunces', serif; font-size: 20px; }
-  .result-empty, .result-multi p { font-size: 15px; line-height: 1.5; margin: 0 0 12px; }
-  .match-list { display: flex; flex-direction: column; gap: 8px; }
-  .match-item { text-align: left; background: #fbf6e9; border: 2px solid var(--ink); padding: 10px 14px; font-size: 15px; color: var(--ink); }
-  .match-item:hover { background: #f2e6c9; }
-
-  .admin-link { background: none; color: rgba(239,227,192,0.45); font-size: 13px; text-decoration: underline; padding: 4px; }
-  .admin-link:hover { color: rgba(239,227,192,0.75); }
-
-  .admin-panel { width: 100%; background: var(--charcoal-2); border: 1px solid rgba(239,227,192,0.15); padding: 22px; display: none; font-size: 14px; }
-  .admin-panel.show { display: block; }
-  .admin-panel h4 { font-family: 'Fraunces', serif; margin: 0 0 4px; font-size: 18px; color: var(--paper); }
-  .admin-panel p { color: rgba(239,227,192,0.6); line-height: 1.5; margin: 0 0 14px; }
-  .admin-panel label { display: block; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(239,227,192,0.55); margin-bottom: 6px; }
-  .admin-panel input[type="text"].title-input { width: 100%; margin-bottom: 16px; background: var(--charcoal); border-color: rgba(239,227,192,0.3); color: var(--paper); }
-
-  .drop-zone {
-    border: 2px dashed rgba(239,227,192,0.35); padding: 26px 16px; text-align: center;
-    margin-bottom: 16px; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease;
-  }
-  .drop-zone:hover, .drop-zone.drag { border-color: var(--paper); background: rgba(239,227,192,0.04); }
-  .drop-zone input { display: none; }
-  .drop-zone .dz-title { font-size: 15px; color: var(--paper); margin-bottom: 4px; }
-  .drop-zone .dz-sub { font-size: 12px; color: rgba(239,227,192,0.5); }
-
-  .mapping-row { display: flex; gap: 12px; margin-bottom: 16px; }
-  .mapping-col { flex: 1; }
-  select {
-    width: 100%; font-family: 'Space Grotesk', sans-serif; font-size: 14px; padding: 9px 10px;
-    background: var(--charcoal); color: var(--paper); border: 2px solid rgba(239,227,192,0.3);
-  }
-
-  .preview-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 13px; }
-  .preview-table th, .preview-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(239,227,192,0.12); }
-  .preview-table th { color: rgba(239,227,192,0.5); font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; }
-  .preview-note { font-size: 12px; color: rgba(239,227,192,0.45); margin: 0 0 18px; }
-
-  .admin-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
-  .btn-save { background: var(--green); color: #fff; padding: 10px 18px; font-size: 14px; border: 2px solid rgba(255,255,255,0.15); }
-  .btn-save:hover { background: #4e5b40; }
-  .btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-outline { background: transparent; color: var(--paper); padding: 10px 18px; font-size: 14px; border: 2px solid rgba(239,227,192,0.4); }
-  .btn-outline:hover { border-color: var(--paper); }
-  .status-msg { font-size: 13px; color: rgba(239,227,192,0.6); }
-  .status-msg.ok { color: #b7c99e; }
-  .status-msg.err { color: #e0968a; }
-  .count-badge { display: block; font-size: 12px; color: rgba(239,227,192,0.5); margin-top: 12px; }
+  .group-info { flex: 1; padding-top: 2px; }
+  .group-side { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 4px; }
+  .group-members { font-size: 14.5px; line-height: 1.5; color: var(--ink); margin: 0; }
+  .group-members strong { color: var(--red); }
 
   @media (max-width: 380px) {
-    .group-number { font-size: 58px; }
     .ticket { padding: 28px 20px 22px; }
-    .mapping-row { flex-direction: column; }
   }
 </style>
 </head>
 <body>
 
 <div class="stage">
-  <div class="kicker"><strong>Family Photo</strong> · find your group before we line up</div>
+  <div class="kicker"><strong>Family Photo</strong> · find your groups before we line up</div>
 
   <div class="ticket">
-    <h1 class="ticket-title" id="eventTitle">Find Your Photo Group</h1>
-    <p class="ticket-sub">Please enter head of the family name and we'll tell you your group number.</p>
+    <h1 class="ticket-title">Find Your Photo Groups</h1>
+    <p class="ticket-sub" id="subText">Type your name — we'll show every group you're in.</p>
 
     <span class="field-label">Your name</span>
     <div class="name-row">
-      <input type="text" id="nameInput" placeholder="e.g. Priya Shah" autocomplete="off">
-      <button class="btn-primary" id="searchBtn">Find</button>
+      <input type="text" id="nameInput" placeholder="e.g. Kirti" autocomplete="off" disabled>
+      <button class="btn-primary" id="searchBtn" disabled>Find</button>
     </div>
 
     <div class="result" id="result"></div>
   </div>
-
-  <button class="admin-link" id="adminToggle">Organizer? Upload your guest list</button>
-
-  <div class="admin-panel" id="adminPanel">
-    <h4>Upload your guest list</h4>
-    <p>Upload the spreadsheet you already have (.xlsx, .xls, or .csv). Nothing is sent anywhere — it's read directly in your browser.</p>
-
-    <label class="drop-zone" id="dropZone">
-      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
-      <div class="dz-title" id="dzTitle">Click to choose a file, or drag it here</div>
-      <div class="dz-sub" id="dzSub">One row per guest, with a name column and a group column</div>
-    </label>
-
-    <div id="mappingSection" style="display:none;">
-      <div class="mapping-row">
-        <div class="mapping-col">
-          <label for="nameColSelect">Which column is the name?</label>
-          <select id="nameColSelect"></select>
-        </div>
-        <div class="mapping-col">
-          <label for="groupColSelect">Which column is the group number?</label>
-          <select id="groupColSelect"></select>
-        </div>
-      </div>
-
-      <label for="titleInput">Page heading</label>
-      <input type="text" id="titleInput" class="title-input" placeholder="Find Your Photo Group" value="Find Your Photo Group">
-
-      <label>Preview</label>
-      <table class="preview-table" id="previewTable"></table>
-      <p class="preview-note" id="previewNote"></p>
-
-      <div class="admin-actions">
-        <button class="btn-outline" id="applyBtn">Try it above</button>
-        <button class="btn-save" id="downloadBtn">Download site file</button>
-      </div>
-      <span class="status-msg" id="statusMsg"></span>
-      <span class="count-badge" id="countBadge"></span>
-    </div>
-  </div>
 </div>
 
 <script>
-(function () {
-  var nameInput = document.getElementById('nameInput');
-  var searchBtn = document.getElementById('searchBtn');
-  var resultEl = document.getElementById('result');
-  var adminToggle = document.getElementById('adminToggle');
-  var adminPanel = document.getElementById('adminPanel');
-  var dropZone = document.getElementById('dropZone');
-  var fileInput = document.getElementById('fileInput');
-  var dzTitle = document.getElementById('dzTitle');
-  var dzSub = document.getElementById('dzSub');
-  var mappingSection = document.getElementById('mappingSection');
-  var nameColSelect = document.getElementById('nameColSelect');
-  var groupColSelect = document.getElementById('groupColSelect');
-  var titleInput = document.getElementById('titleInput');
-  var previewTable = document.getElementById('previewTable');
-  var previewNote = document.getElementById('previewNote');
-  var applyBtn = document.getElementById('applyBtn');
-  var downloadBtn = document.getElementById('downloadBtn');
-  var statusMsg = document.getElementById('statusMsg');
-  var countBadge = document.getElementById('countBadge');
-  var eventTitle = document.getElementById('eventTitle');
+/* =========================================================================
+   EDIT THIS ONE LINE, then upload the file — that's the only setup step.
 
-  var guests = [];       // {name, group} currently active for the search box above
-  var rawRows = [];      // parsed rows from the uploaded file (array of arrays)
-  var headerRow = [];    // header labels
+   1. In Google Sheets: File -> Share -> Publish to web
+   2. Choose the sheet, set format to "Comma-separated values (.csv)", click Publish
+   3. Copy the link and paste it below, between the quotes
+   ========================================================================= */
+var SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSts9ykc8KUu0nG4mlm4x3lAsOkxZKZSoi2yx7syOlOU_qKfRFvDV0sMYqfMcIlokTWBpIRSpcNUQu/pub?output=csv";
+/* ========================================================================= */
 
-  function normalize(s) { return String(s).trim().toLowerCase().replace(/\s+/g, ' '); }
+var nameInput = document.getElementById('nameInput');
+var searchBtn = document.getElementById('searchBtn');
+var resultEl = document.getElementById('result');
+var subText = document.getElementById('subText');
+var photoGroups = []; // [{ number, side, members: [] }]
 
-  function guessColumn(headers, keywords) {
-    for (var i = 0; i < headers.length; i++) {
-      var h = normalize(headers[i] || '');
-      for (var k = 0; k < keywords.length; k++) {
-        if (h.indexOf(keywords[k]) !== -1) return i;
+function normalize(s) { return String(s).trim().toLowerCase().replace(/\s+/g, ' '); }
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function findColIndex(headerRow, keywords, exact) {
+  for (var i = 0; i < headerRow.length; i++) {
+    var h = normalize(headerRow[i] || '');
+    if (!h) continue;
+    for (var j = 0; j < keywords.length; j++) {
+      if (exact ? h === keywords[j] : h.indexOf(keywords[j]) !== -1) return i;
+    }
+  }
+  return -1;
+}
+
+function loadGuests() {
+  if (!SHEET_CSV_URL || SHEET_CSV_URL.indexOf('PASTE_YOUR') === 0) {
+    subText.textContent = "This page isn't connected to a guest list yet — the organizer needs to add the sheet link.";
+    return;
+  }
+  fetch(SHEET_CSV_URL)
+    .then(function (res) {
+      if (!res.ok) throw new Error('fetch failed');
+      return res.text();
+    })
+    .then(function (csvText) {
+      var parsed = Papa.parse(csvText, { header: false, skipEmptyLines: true });
+      var rows = parsed.data;
+      if (!rows.length) throw new Error('empty sheet');
+
+      var headerRow = rows[0];
+      var dataRows = rows.slice(1);
+
+      var groupColIdx = findColIndex(headerRow, ['group #'], false);
+      var sideColIdx = findColIndex(headerRow, ['side'], false);
+      if (groupColIdx === -1) throw new Error('no group column');
+
+      var memberColIndices = [];
+      for (var i = 0; i < headerRow.length; i++) {
+        if (normalize(headerRow[i] || '').indexOf('family member') !== -1) memberColIndices.push(i);
       }
-    }
-    return -1;
-  }
 
-  function colLabel(h, i) {
-    var trimmed = String(h || '').trim();
-    return trimmed ? trimmed : ('Column ' + (i + 1));
-  }
+      photoGroups = dataRows.map(function (row) {
+        var number = String(row[groupColIdx] || '').trim();
+        var side = sideColIdx !== -1 ? String(row[sideColIdx] || '').trim() : '';
+        var members = memberColIndices
+          .map(function (idx) { return String(row[idx] || '').trim(); })
+          .filter(function (v) { return v !== ''; });
+        return { number: number, side: side, members: members };
+      }).filter(function (g) { return g.number && g.members.length > 0; });
 
-  function populateSelects() {
-    nameColSelect.innerHTML = '';
-    groupColSelect.innerHTML = '';
-    for (var i = 0; i < headerRow.length; i++) {
-      var label = colLabel(headerRow[i], i);
-      var opt1 = document.createElement('option'); opt1.value = i; opt1.textContent = label;
-      var opt2 = document.createElement('option'); opt2.value = i; opt2.textContent = label;
-      nameColSelect.appendChild(opt1);
-      groupColSelect.appendChild(opt2);
-    }
-    var nameGuess = guessColumn(headerRow, ['name']);
-    var groupGuess = guessColumn(headerRow, ['group', 'table', 'number']);
-    if (nameGuess === -1) nameGuess = 0;
-    if (groupGuess === -1 || groupGuess === nameGuess) groupGuess = headerRow.length > 1 ? 1 : 0;
-    nameColSelect.value = nameGuess;
-    groupColSelect.value = groupGuess;
-  }
+      if (!photoGroups.length) throw new Error('no groups parsed');
 
-  function buildGuestsFromMapping() {
-    var nameIdx = parseInt(nameColSelect.value, 10);
-    var groupIdx = parseInt(groupColSelect.value, 10);
-    var out = [];
-    for (var i = 0; i < rawRows.length; i++) {
-      var row = rawRows[i];
-      var nm = row[nameIdx] !== undefined ? String(row[nameIdx]).trim() : '';
-      var gp = row[groupIdx] !== undefined ? String(row[groupIdx]).trim() : '';
-      if (nm && gp) out.push({ name: nm, group: gp });
-    }
-    return out;
-  }
-
-  function renderPreview() {
-    var mapped = buildGuestsFromMapping();
-    var rowsHtml = '<tr><th>Name</th><th>Group</th></tr>';
-    var showCount = Math.min(mapped.length, 6);
-    for (var i = 0; i < showCount; i++) {
-      rowsHtml += '<tr><td>' + escapeHtml(mapped[i].name) + '</td><td>' + escapeHtml(mapped[i].group) + '</td></tr>';
-    }
-    previewTable.innerHTML = rowsHtml;
-    previewNote.textContent = mapped.length
-      ? (mapped.length + ' guest' + (mapped.length === 1 ? '' : 's') + ' found' + (mapped.length > showCount ? ' (showing first ' + showCount + ')' : ''))
-      : 'No guests matched those columns — try picking different ones.';
-    downloadBtn.disabled = mapped.length === 0;
-    return mapped;
-  }
-
-  function escapeHtml(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
-  function handleFile(file) {
-    if (!file) return;
-    dzTitle.textContent = file.name;
-    dzSub.textContent = 'Parsing…';
-    var reader = new FileReader();
-    reader.onload = function (e) {
-      try {
-        var data = new Uint8Array(e.target.result);
-        var workbook = XLSX.read(data, { type: 'array' });
-        var firstSheetName = workbook.SheetNames[0];
-        var sheet = workbook.Sheets[firstSheetName];
-        var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-        rows = rows.filter(function (r) { return r.some(function (c) { return String(c).trim() !== ''; }); });
-        if (rows.length < 2) {
-          dzSub.textContent = 'Could not find any guest rows in that file.';
-          return;
-        }
-        headerRow = rows[0];
-        rawRows = rows.slice(1);
-        populateSelects();
-        mappingSection.style.display = 'block';
-        dzSub.textContent = rawRows.length + ' rows loaded from "' + firstSheetName + '"';
-        statusMsg.textContent = '';
-        statusMsg.className = 'status-msg';
-        renderPreview();
-      } catch (err) {
-        dzSub.textContent = "Couldn't read that file. Try saving it as .xlsx or .csv and uploading again.";
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  }
-
-  fileInput.addEventListener('change', function () { handleFile(fileInput.files[0]); });
-  dropZone.addEventListener('dragover', function (e) { e.preventDefault(); dropZone.classList.add('drag'); });
-  dropZone.addEventListener('dragleave', function () { dropZone.classList.remove('drag'); });
-  dropZone.addEventListener('drop', function (e) {
-    e.preventDefault(); dropZone.classList.remove('drag');
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-  });
-  nameColSelect.addEventListener('change', renderPreview);
-  groupColSelect.addEventListener('change', renderPreview);
-
-  applyBtn.addEventListener('click', function () {
-    guests = renderPreview();
-    eventTitle.textContent = titleInput.value.trim() || 'Find Your Photo Group';
-    countBadge.textContent = guests.length + ' guest' + (guests.length === 1 ? '' : 's') + ' loaded for testing above';
-    statusMsg.textContent = 'Loaded — try searching a name above.';
-    statusMsg.className = 'status-msg ok';
-  });
-
-  downloadBtn.addEventListener('click', function () {
-    var mapped = renderPreview();
-    if (!mapped.length) return;
-    var title = titleInput.value.trim() || 'Find Your Photo Group';
-    var html = buildExportHtml(title, mapped);
-    var blob = new Blob([html], { type: 'text/html' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'index.html';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    statusMsg.textContent = 'Downloaded — upload this file to GitHub Pages.';
-    statusMsg.className = 'status-msg ok';
-  });
-
-  adminToggle.addEventListener('click', function () {
-    adminPanel.classList.toggle('show');
-    adminToggle.textContent = adminPanel.classList.contains('show')
-      ? 'Hide organizer panel'
-      : 'Organizer? Upload your guest list';
-  });
-
-  // ---- search (same behavior as the exported static page) ----
-  function renderFound(guest) {
-    resultEl.innerHTML =
-      '<div class="result-divider"></div>' +
-      '<div class="result-found">' +
-      '<div class="group-number" id="groupNum">' + escapeHtml(guest.group) + '</div>' +
-      '<div class="result-text"><p>Group</p><h3>' + escapeHtml(guest.name) + '</h3></div>' +
-      '</div>';
-    resultEl.classList.add('show');
-    requestAnimationFrame(function () {
-      var el = document.getElementById('groupNum');
-      if (el) el.classList.add('pop');
+      subText.textContent = "Type your name — we'll show every group you're in.";
+      nameInput.disabled = false;
+      searchBtn.disabled = false;
+      nameInput.focus();
+    })
+    .catch(function () {
+      subText.textContent = "Couldn't load the guest list right now. Check with the organizer, or try refreshing in a minute.";
     });
-  }
-  function renderNotFound(query) {
-    resultEl.innerHTML =
-      '<div class="result-divider"></div>' +
-      '<div class="result-empty"><p>We couldn\'t find "' + escapeHtml(query) + '" on the list. Try just your first name, or check with the organizer.</p></div>';
-    resultEl.classList.add('show');
-  }
-  function renderMultiple(matches) {
-    var items = matches.map(function (g) {
-      return '<button class="match-item" data-name="' + escapeHtml(g.name) + '">' + escapeHtml(g.name) + ' — Group ' + escapeHtml(g.group) + '</button>';
-    }).join('');
-    resultEl.innerHTML =
-      '<div class="result-divider"></div>' +
-      '<div class="result-multi"><p>A few names matched. Which one is you?</p><div class="match-list">' + items + '</div></div>';
-    resultEl.classList.add('show');
-    var btns = resultEl.querySelectorAll('.match-item');
-    for (var i = 0; i < btns.length; i++) {
-      btns[i].addEventListener('click', function () {
-        var g = guests.filter(function (x) { return x.name === this.dataset.name; }.bind(this))[0];
-        if (g) renderFound(g);
-      });
-    }
-  }
-  function search() {
-    var query = nameInput.value.trim();
-    if (!query) return;
-    var nq = normalize(query);
-    var exact = guests.filter(function (g) { return normalize(g.name) === nq; })[0];
-    if (exact) return renderFound(exact);
-    var contains = guests.filter(function (g) { return normalize(g.name).indexOf(nq) !== -1 || nq.indexOf(normalize(g.name)) !== -1; });
-    if (contains.length === 1) return renderFound(contains[0]);
-    if (contains.length > 1) return renderMultiple(contains);
-    renderNotFound(query);
-  }
-  searchBtn.addEventListener('click', search);
-  nameInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') search(); });
+}
 
-  // ---- export: builds a clean, standalone static page (no upload UI) for guests ----
-  function buildExportHtml(title, guestList) {
-    var dataJson = JSON.stringify({ title: title, guests: guestList }).replace(/<\/script/gi, '<\\/script');
-    var lines = [];
-    lines.push('<!DOCTYPE html>');
-    lines.push('<html lang="en">');
-    lines.push('<head>');
-    lines.push('<meta charset="UTF-8">');
-    lines.push('<meta name="viewport" content="width=device-width, initial-scale=1.0">');
-    lines.push('<title>' + escapeHtml(title) + '</title>');
-    lines.push('<link rel="preconnect" href="https://fonts.googleapis.com">');
-    lines.push('<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">');
-    lines.push('<style>');
-    lines.push(':root{--charcoal:#1b1b1e;--paper:#efe3c0;--ink:#2b2620;--ink-soft:#5a5346;--red:#b23b28;}');
-    lines.push('*{box-sizing:border-box;}');
-    lines.push('html,body{margin:0;padding:0;min-height:100%;background:var(--charcoal);background-image:radial-gradient(circle at 20% 15%, rgba(255,255,255,0.035), transparent 40%),radial-gradient(circle at 85% 80%, rgba(255,255,255,0.03), transparent 45%);font-family:"Space Grotesk",sans-serif;color:var(--paper);display:flex;align-items:center;justify-content:center;padding:40px 16px;}');
-    lines.push('.stage{width:100%;max-width:460px;display:flex;flex-direction:column;align-items:center;gap:22px;}');
-    lines.push('.kicker{font-size:13px;color:rgba(239,227,192,0.55);text-align:center;}');
-    lines.push('.kicker strong{color:var(--paper);font-weight:600;}');
-    lines.push('.ticket{position:relative;width:100%;background:var(--paper);color:var(--ink);transform:rotate(-0.6deg);box-shadow:10px 14px 0 rgba(0,0,0,0.35);padding:34px 30px 28px;}');
-    lines.push('.ticket::before,.ticket::after{content:"";position:absolute;width:26px;height:26px;background:var(--charcoal);border-radius:50%;top:50%;transform:translateY(-50%);box-shadow:0 0 0 4px rgba(0,0,0,0.15) inset;}');
-    lines.push('.ticket::before{left:-13px;} .ticket::after{right:-13px;}');
-    lines.push('.ticket-title{font-family:"Fraunces",serif;font-weight:700;font-size:28px;line-height:1.1;margin:0 0 6px;}');
-    lines.push('.ticket-sub{font-size:14px;color:var(--ink-soft);margin:0 0 24px;}');
-    lines.push('.field-label{font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-soft);display:block;margin-bottom:8px;}');
-    lines.push('.name-row{display:flex;gap:10px;}');
-    lines.push('input[type="text"]{flex:1;font-family:"Space Grotesk",sans-serif;font-size:17px;padding:12px 14px;border:2px solid var(--ink);background:#fbf6e9;color:var(--ink);outline:none;}');
-    lines.push('input[type="text"]:focus{border-color:var(--red);}');
-    lines.push('button{font-family:"Space Grotesk",sans-serif;font-weight:600;cursor:pointer;border:none;}');
-    lines.push('.btn-primary{background:var(--red);color:var(--paper);font-size:15px;padding:0 20px;border:2px solid var(--ink);}');
-    lines.push('.btn-primary:hover{background:#9c331f;}');
-    lines.push('.result{margin-top:24px;display:none;} .result.show{display:block;}');
-    lines.push('.result-divider{border-top:2px dashed rgba(43,38,32,0.3);margin-bottom:22px;}');
-    lines.push('.result-found{display:flex;align-items:center;gap:20px;}');
-    lines.push('.group-number{font-family:"Fraunces",serif;font-weight:900;font-size:76px;line-height:0.9;color:var(--red);transform:scale(0.7);opacity:0;transition:transform 0.35s cubic-bezier(.2,1.4,.4,1),opacity 0.25s ease;}');
-    lines.push('.group-number.pop{transform:scale(1);opacity:1;}');
-    lines.push('.result-text p{margin:0 0 4px;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-soft);}');
-    lines.push('.result-text h3{margin:0;font-family:"Fraunces",serif;font-size:20px;}');
-    lines.push('.result-empty,.result-multi p{font-size:15px;line-height:1.5;margin:0 0 12px;}');
-    lines.push('.match-list{display:flex;flex-direction:column;gap:8px;}');
-    lines.push('.match-item{text-align:left;background:#fbf6e9;border:2px solid var(--ink);padding:10px 14px;font-size:15px;color:var(--ink);}');
-    lines.push('.match-item:hover{background:#f2e6c9;}');
-    lines.push('@media (max-width:380px){.group-number{font-size:58px;} .ticket{padding:28px 20px 22px;}}');
-    lines.push('</style>');
-    lines.push('</head>');
-    lines.push('<body>');
-    lines.push('<div class="stage">');
-    lines.push('<div class="kicker"><strong>Family Photo</strong> · find your group before we line up</div>');
-    lines.push('<div class="ticket">');
-    lines.push('<h1 class="ticket-title">' + escapeHtml(title) + '</h1>');
-    lines.push('<p class="ticket-sub">Type your name and we\'ll tell you where to stand.</p>');
-    lines.push('<span class="field-label">Your name</span>');
-    lines.push('<div class="name-row"><input type="text" id="nameInput" placeholder="e.g. Priya Shah" autocomplete="off"><button class="btn-primary" id="searchBtn">Find</button></div>');
-    lines.push('<div class="result" id="result"></div>');
-    lines.push('</div>');
-    lines.push('</div>');
-    lines.push('<script>');
-    lines.push('var GUEST_DATA = ' + dataJson + ';');
-    lines.push('var guests = GUEST_DATA.guests;');
-    lines.push('var nameInput = document.getElementById("nameInput");');
-    lines.push('var searchBtn = document.getElementById("searchBtn");');
-    lines.push('var resultEl = document.getElementById("result");');
-    lines.push('function normalize(s){return String(s).trim().toLowerCase().replace(/\\s+/g," ");}');
-    lines.push('function escapeHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}');
-    lines.push('function renderFound(guest){resultEl.innerHTML="<div class=\\"result-divider\\"></div><div class=\\"result-found\\"><div class=\\"group-number\\" id=\\"groupNum\\">"+escapeHtml(guest.group)+"</div><div class=\\"result-text\\"><p>Group</p><h3>"+escapeHtml(guest.name)+"</h3></div></div>";resultEl.classList.add("show");requestAnimationFrame(function(){var el=document.getElementById("groupNum");if(el)el.classList.add("pop");});}');
-    lines.push('function renderNotFound(query){resultEl.innerHTML="<div class=\\"result-divider\\"></div><div class=\\"result-empty\\"><p>We couldn\\u2019t find \\""+escapeHtml(query)+"\\" on the list. Try just your first name, or check with the organizer.</p></div>";resultEl.classList.add("show");}');
-    lines.push('function renderMultiple(matches){var items=matches.map(function(g){return "<button class=\\"match-item\\" data-name=\\""+escapeHtml(g.name)+"\\">"+escapeHtml(g.name)+" \\u2014 Group "+escapeHtml(g.group)+"</button>";}).join("");resultEl.innerHTML="<div class=\\"result-divider\\"></div><div class=\\"result-multi\\"><p>A few names matched. Which one is you?</p><div class=\\"match-list\\">"+items+"</div></div>";resultEl.classList.add("show");var btns=resultEl.querySelectorAll(".match-item");for(var i=0;i<btns.length;i++){btns[i].addEventListener("click",function(){var g=guests.filter(function(x){return x.name===this.dataset.name;}.bind(this))[0];if(g)renderFound(g);});}}');
-    lines.push('function search(){var query=nameInput.value.trim();if(!query)return;var nq=normalize(query);var exact=guests.filter(function(g){return normalize(g.name)===nq;})[0];if(exact)return renderFound(exact);var contains=guests.filter(function(g){return normalize(g.name).indexOf(nq)!==-1||nq.indexOf(normalize(g.name))!==-1;});if(contains.length===1)return renderFound(contains[0]);if(contains.length>1)return renderMultiple(contains);renderNotFound(query);}');
-    lines.push('searchBtn.addEventListener("click",search);');
-    lines.push('nameInput.addEventListener("keydown",function(e){if(e.key==="Enter")search();});');
-    lines.push('<' + '/script>');
-    lines.push('</body>');
-    lines.push('</html>');
-    return lines.join('\n');
+function renderResults(matches, query) {
+  var nq = normalize(query);
+  if (!matches.length) {
+    resultEl.innerHTML =
+      '<div class="result-divider"></div>' +
+      '<div class="result-empty"><p>We couldn\'t find "' + escapeHtml(query) + '" in any group. Try just your first name, or check with the organizer.</p></div>';
+    resultEl.classList.add('show');
+    return;
   }
-})();
+
+  var blocks = matches.map(function (g) {
+    var membersHtml = g.members.map(function (m) {
+      var isYou = normalize(m).indexOf(nq) !== -1 || nq.indexOf(normalize(m)) !== -1;
+      return isYou ? '<strong>' + escapeHtml(m) + '</strong>' : escapeHtml(m);
+    }).join(', ');
+    var sideHtml = g.side ? '<p class="group-side">' + escapeHtml(g.side) + '</p>' : '';
+    return '<div class="group-block">' +
+      '<div class="group-number-badge">' + escapeHtml(g.number) + '</div>' +
+      '<div class="group-info">' + sideHtml + '<p class="group-members">' + membersHtml + '</p></div>' +
+      '</div>';
+  }).join('');
+
+  resultEl.innerHTML =
+    '<div class="result-divider"></div>' +
+    '<p class="result-count">You\'re in ' + matches.length + ' group' + (matches.length === 1 ? '' : 's') + ':</p>' +
+    blocks;
+  resultEl.classList.add('show');
+}
+
+function search() {
+  var query = nameInput.value.trim();
+  if (!query) return;
+  var nq = normalize(query);
+  var matches = photoGroups.filter(function (g) {
+    return g.members.some(function (m) {
+      return normalize(m).indexOf(nq) !== -1 || nq.indexOf(normalize(m)) !== -1;
+    });
+  });
+  renderResults(matches, query);
+}
+searchBtn.addEventListener('click', search);
+nameInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') search(); });
+
+loadGuests();
 </script>
 
 </body>
