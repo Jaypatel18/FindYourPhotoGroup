@@ -85,9 +85,9 @@
 
   <div class="ticket">
     <h1 class="ticket-title">Find Your Photo Groups</h1>
-    <p class="ticket-sub" id="subText">Type your name — we'll show every group you're in.</p>
+    <p class="ticket-sub" id="subText">Type your first name — we'll show every group you're in.</p>
 
-    <span class="field-label">Your name</span>
+    <span class="field-label">Your First Name</span>
     <div class="name-row">
       <input type="text" id="nameInput" placeholder="e.g. Sam Smith" autocomplete="off" disabled>
       <button class="btn-primary" id="searchBtn" disabled>Find</button>
@@ -193,7 +193,7 @@ function loadGuests() {
 
       if (!photoGroups.length) throw new Error('no groups parsed');
 
-      subText.textContent = "Type your name — we'll show every group you're in.";
+      subText.textContent = "Type your first name — we'll show every group you're in.";
       nameInput.disabled = false;
       searchBtn.disabled = false;
       nameInput.focus();
